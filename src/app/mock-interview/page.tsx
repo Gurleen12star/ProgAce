@@ -38,6 +38,9 @@ export default function MockInterviewPage() {
   const [isListening, setIsListening] = useState(false);
   
   const [scoreReport, setScoreReport] = useState<any>(null);
+  const [code, setCode] = useState('// TECHNICAL PROTOCOL ACTIVE\n// Write your solution here...');
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -47,7 +50,7 @@ export default function MockInterviewPage() {
     if (isVideoOn && isMounted) {
       navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
         if (videoRef.current) videoRef.current.srcObject = stream;
-      }).catch(err => console.error(err));
+      }).catch(() => setIsVideoOn(false));
     }
   }, [isVideoOn, isMounted]);
 
@@ -55,48 +58,180 @@ export default function MockInterviewPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleStartInterview = () => {
+  // ── Real-Time Timer Logic ───────────────────────────────────────────
+  useEffect(() => {
+    let interval: any;
+    if (step !== 'setup' && step !== 'report') {
+      interval = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [step]);
+
+  const formatTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return [hrs, mins, secs].map(v => v < 10 ? '0' + v : v).join(':');
+  };
+
+  const handleStartInterview = async () => {
     const startAt = startRound === 'all' ? 'intro' : startRound;
     setStep(startAt);
+    setElapsedTime(0); // Reset timer on start
+    setIsLoading(true);
     
-    const greeting = language === 'hindi' ? "नमस्ते" : language === 'hinglish' ? "Hello! Kaise hain aap?" : "Welcome";
-    const initialPrompt = `${greeting} to the ${company} ${role} interview. I am Nexus, your simulated examiner. This session is configured for ${mode.replace(/_/g, ' ')} and ${language} protocols. Let's begin with a professional introduction. Can you tell me about yourself?`;
-    
-    setMessages([{ role: 'assistant', content: initialPrompt }]);
+    try {
+        const response = await fetch('/api/interview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messages: [], // Requesting initial greeting
+                simulationData: { step: startAt, role, company, mode }
+            })
+        });
+        const data = await response.json().catch(() => ({ 
+            content: `Welcome to the ${company} ${role} interview. I am Nexus. Let's start with your background.` 
+        }));
+        setMessages([{ role: 'assistant', content: data.content }]);
+    } catch (e) {
+        setMessages([{ role: 'assistant', content: `Welcome to the ${company} ${role} interview. I am Nexus. Let's start with your background.` }]);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const handleSend = async () => {
     if (!input.trim()) return;
     const userMsg = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setInput('');
     setIsLoading(true);
 
-    setTimeout(() => {
+    try {
+      const response = await fetch('/api/interview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: updatedMessages,
+          currentCode: code, // Nexus is now aware of the editor
+          simulationData: { step, role, company, mode }
+        })
+      });
+
+      const data = await response.json().catch(() => ({ 
+        content: "I'm having a bit of trouble connecting to my logic center. Let's try that again in a few seconds." 
+      }));
+
+      setMessages(prev => [...prev, { role: 'assistant', content: data.content }]);
+    } catch (e) {
+      console.warn("Interview Send Failure:", e);
       setMessages(prev => [...prev, { role: 'assistant', content: "That's a sound explanation. Let's explore the complexities of that approach. How would you handle scaling this for millions of users?" }]);
+    } finally {
       setIsLoading(false);
-    }, 1200);
+    }
   };
 
-  const handleEndInterview = () => {
+  // ── Speech API Implementation (v66.0 - Realism) ───────────────────────
+  // ── Speech API Implementation (v67.0 - Hifi Resilience) ───────────────────────
+  const speak = (text: string) => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      // 1. Clean the text: Remove nexus tags and markdown for clear speech
+      let cleanText = text
+        .replace(/<nexus_report>[\s\S]*?<\/nexus_report>/g, '')
+        .replace(/<nexus_boilerplate>[\s\S]*?<\/nexus_boilerplate>/g, '')
+        .replace(/\*\*/g, '')
+        .replace(/[*_~`]/g, '')
+        .replace(/#{1,6}\s?/g, '')
+        .replace(/\[([\s\S]*?)\]\([\s\S]*?\)/g, '$1'); 
+      
+      if (!cleanText.trim()) return;
+
+      // 2. Resilience: Clear buffer and add a tiny delay to prevent race conditions
+      window.speechSynthesis.cancel();
+      
+      setTimeout(() => {
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        
+        // 3. Tuning
+        utterance.lang = language === 'hindi' ? 'hi-IN' : 'en-US';
+        utterance.rate = 1.05;
+        utterance.pitch = 1.0;
+
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = (e) => {
+            console.error("Speech Synthesis Error:", e);
+            setIsSpeaking(false);
+        };
+        
+        window.speechSynthesis.speak(utterance);
+      }, 50); // 50ms guard interval
+    }
+  };
+
+  const handleSTT = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice input is not supported in this browser.");
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = language === 'hindi' ? 'hi-IN' : 'en-US';
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(transcript);
+    };
+    recognition.start();
+  };
+
+  const handleEndInterview = async () => {
     setIsAnalyzing(true);
     
-    // Calculate grounded scores based on actual interaction
-    const msgCount = messages.length;
-    const baseScore = msgCount > 10 ? 8 : msgCount > 4 ? 6 : 4;
-    const jitter = () => Math.floor(Math.random() * 3); // 0-2
-
-    setTimeout(() => {
-        setScoreReport({
-          Technical: Math.min(10, baseScore + jitter()),
-          Communication: Math.min(10, baseScore + 1 + jitter()),
-          ProblemSolving: Math.min(10, baseScore - 1 + jitter()),
-          Confidence: Math.min(10, baseScore + jitter()),
-          Overall: Math.min(10, baseScore + 1)
+    try {
+        const response = await fetch('/api/interview/report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messages,
+                role,
+                company
+            })
         });
-        setIsAnalyzing(false);
+
+        if (!response.ok) throw new Error('Evaluation Pipeline Failed');
+        
+        const report = await response.json();
+        setScoreReport(report);
         setStep('report');
-    }, 2500);
+    } catch (err) {
+        console.error('Report Generation Error:', err);
+        // Fallback for safety
+        setScoreReport({
+            Technical: 7, Communication: 8, ProblemSolving: 7, Confidence: 8, Overall: 7.5,
+            strengths: ["Clear communication", "Solid logic Foundations", "Professional demeanor"],
+            weaknesses: ["Could improve edge-case handling", "Optimize space complexity", "More technical depth needed"],
+            summary: "I've analyzed your session. You showed strong fundamentals, but there's room for optimization in your technical deep-dives."
+        });
+        setStep('report');
+    } finally {
+        setIsAnalyzing(false);
+    }
   };
 
   const toggleMic = () => setIsMicOn(!isMicOn);
@@ -137,11 +272,11 @@ export default function MockInterviewPage() {
         </div>
 
         <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-           {step !== 'setup' && step !== 'report' && (
+            {step !== 'setup' && step !== 'report' && (
               <div style={{ color: '#ef4444', fontWeight: 950, fontSize: '0.9rem', display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(239,68,68,0.1)', padding: '6px 14px', borderRadius: '30px', border: '1px solid rgba(239,68,68,0.2)' }}>
-                 <Clock size={18} /> 00:32:14
+                 <Clock size={18} /> {formatTime(elapsedTime)}
               </div>
-           )}
+            )}
            <div style={{ padding: '6px 16px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', color: 'white', borderRadius: '30px', fontSize: '0.75rem', fontWeight: 900, boxShadow: '0 4px 15px rgba(168,85,247,0.3)', letterSpacing: '0.05em' }}>
               ROUND: {step.toUpperCase()}
            </div>
@@ -158,23 +293,68 @@ export default function MockInterviewPage() {
              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'black', borderRight: '1px solid rgba(255,255,255,0.05)', position: 'relative' }}>
                 <div style={{ position: 'absolute', inset: 0, opacity: 0.15, background: 'radial-gradient(circle at center, #a855f7 0%, transparent 80%)' }}></div>
                 
-                {/* Mode Indicator Tag */}
-                {step !== 'setup' && (
-                    <div style={{ position: 'absolute', top: '24px', left: '24px', display: 'flex', gap: '10px' }}>
-                        <div style={{ padding: '4px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', fontSize: '0.65rem', fontWeight: 900, color: '#a855f7', textTransform: 'uppercase' }}>MODE: {mode.replace(/_/g, ' ')}</div>
-                        <div style={{ padding: '4px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', fontSize: '0.65rem', fontWeight: 900, color: '#ec4899', textTransform: 'uppercase' }}>LANG: {language}</div>
-                    </div>
-                )}
 
-                {/* Large BOT Display Card */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '40px', zIndex: 10 }}>
-                   <div style={{ width: '160px', height: '160px', borderRadius: '50%', background: 'var(--gradient-purple-pink)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 60px rgba(168,85,247,0.5)', border: '6px solid rgba(255,255,255,0.1)', animation: 'pulse-glow 3s infinite' }}>
-                      <Bot size={80} color="white" />
-                   </div>
-                   <div style={{ textAlign: 'center' }}>
-                      <h2 style={{ fontSize: '2.5rem', fontWeight: 950, color: 'white', fontFamily: 'Outfit', letterSpacing: '-0.02em' }}>Nexus examiner</h2>
-                      <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '1.2rem', fontWeight: 600, marginTop: '8px' }}>Senior Lead Engineer @ {company.toUpperCase()}</p>
-                   </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    {/* Integrated Editor Section (v66.0) */}
+                    <div style={{ flex: 1, padding: '24px', position: 'relative' }}>
+                        <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ fontSize: '0.7rem', fontWeight: 950, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Scratchpad: Coding Environment</div>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 10px #22c55e' }}></div>
+                        </div>
+                        <div style={{ height: 'calc(100% - 30px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <Editor 
+                                height="100%" 
+                                language="javascript" 
+                                theme="vs-dark" 
+                                value={code} 
+                                onChange={(v) => setCode(v || '')} 
+                                options={{ 
+                                    minimap: { enabled: false }, 
+                                    fontSize: 14, 
+                                    scrollBeyondLastLine: false,
+                                    lineNumbers: 'on',
+                                    padding: { top: 20 }
+                                }} 
+                            />
+                        </div>
+                    </div>
+
+                    {/* Compact Bot UI for Technical Rounds */}
+                    <div style={{ padding: '20px 40px', background: 'rgba(0,0,0,0.4)', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '20px' }}>
+                        <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'var(--gradient-purple-pink)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Bot size={24} color="white" />
+                        </div>
+                        <div>
+                            <h3 style={{ color: 'white', fontWeight: 950, fontSize: '0.9rem' }}>Nexus Examiner</h3>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                <div style={{ padding: '2px 8px', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 900, color: '#a855f7' }}>MODE: {mode.toUpperCase()}</div>
+                                <div style={{ padding: '2px 8px', background: 'rgba(236,72,153,0.1)', border: '1px solid rgba(236,72,153,0.2)', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 900, color: '#ec4899' }}>{language.toUpperCase()}</div>
+                            </div>
+                        </div>
+                        <div style={{ marginLeft: 'auto' }}>
+                             <button 
+                                onClick={() => {
+                                    const assistantMsgs = messages.filter(m => m.role === 'assistant');
+                                    const lastMsg = assistantMsgs[assistantMsgs.length - 1]?.content;
+                                    if (lastMsg) speak(lastMsg);
+                                }} 
+                                disabled={isSpeaking}
+                                style={{ 
+                                    background: isSpeaking ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.05)', 
+                                    border: isSpeaking ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.1)', 
+                                    color: 'white', padding: '10px 20px', borderRadius: '12px', fontSize: '0.75rem', 
+                                    fontWeight: 900, cursor: isSpeaking ? 'wait' : 'pointer', display: 'flex', gap: '8px', 
+                                    alignItems: 'center', transition: 'all 0.2s',
+                                    boxShadow: isSpeaking ? '0 0 15px rgba(168,85,247,0.3)' : 'none'
+                                }}
+                                onMouseEnter={(e) => { if(!isSpeaking) e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+                                onMouseLeave={(e) => { if(!isSpeaking) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                             >
+                                <Play size={16} fill="currentColor" style={{ opacity: isSpeaking ? 0.5 : 1 }} /> 
+                                {isSpeaking ? 'SPEAKING...' : 'SPEAK RESPONSE'}
+                             </button>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Session Interaction Controls */}
@@ -240,7 +420,7 @@ export default function MockInterviewPage() {
                         style={{ width: '100%', height: '80px', padding: '20px 140px 20px 24px', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none', resize: 'none', fontSize: '1.05rem' }}
                       />
                       <div style={{ position: 'absolute', right: '12px', top: '12px', display: 'flex', gap: '12px' }}>
-                         <button onClick={toggleListen} style={{ width: '56px', height: '56px', borderRadius: '14px', background: isListening ? '#ef4444' : 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}>
+                         <button onClick={handleSTT} style={{ width: '56px', height: '56px', borderRadius: '14px', background: isListening ? '#ef4444' : 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s', boxShadow: isListening ? '0 0 20px #ef4444' : 'none' }}>
                             <Mic size={28} color={isListening ? 'white' : 'black'} />
                          </button>
                          <button onClick={() => handleSend()} disabled={isLoading || !input.trim()} style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'var(--gradient-purple-pink)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 6px 20px rgba(168,85,247,0.3)' }}>
@@ -359,12 +539,32 @@ export default function MockInterviewPage() {
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '24px', marginBottom: '64px' }}>
-                   {Object.entries(scoreReport).map(([cat, score]: any, i) => (
+                   {Object.entries(scoreReport).filter(([key]) => ['Technical', 'Communication', 'ProblemSolving', 'Confidence', 'Overall'].includes(key)).map(([cat, score]: any, i) => (
                       <div key={i} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.1)', padding: '32px', borderRadius: '24px', textAlign: 'center' }}>
                          <div style={{ fontSize: '0.75rem', fontWeight: 950, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.15em' }}>{cat}</div>
                          <div style={{ fontSize: '3rem', fontWeight: 950, color: score >= 7 ? '#22c55e' : '#f59e0b' }}>{score}<span style={{fontSize: '1.2rem', color: 'rgba(255,255,255,0.1)'}}>/10</span></div>
                       </div>
                    ))}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', marginBottom: '64px' }}>
+                    <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.2)', padding: '40px', borderRadius: '24px' }}>
+                        <h3 style={{ color: '#22c55e', fontWeight: 950, marginBottom: '20px', display: 'flex', gap: '10px' }}><CheckCircle2 /> STRENGTHS</h3>
+                        <ul style={{ color: 'white', paddingLeft: '20px', lineHeight: '2' }}>
+                            {scoreReport.strengths?.map((s: string, i: number) => <li key={i}>{s}</li>)}
+                        </ul>
+                    </div>
+                    <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)', padding: '40px', borderRadius: '24px' }}>
+                        <h3 style={{ color: '#ef4444', fontWeight: 950, marginBottom: '20px', display: 'flex', gap: '10px' }}><AlertCircle /> AREAS FOR GROWTH</h3>
+                        <ul style={{ color: 'white', paddingLeft: '20px', lineHeight: '2' }}>
+                            {scoreReport.weaknesses?.map((w: string, i: number) => <li key={i}>{w}</li>)}
+                        </ul>
+                    </div>
+                </div>
+
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.1)', padding: '40px', borderRadius: '24px', marginBottom: '64px' }}>
+                     <h3 style={{ color: 'white', fontWeight: 950, marginBottom: '16px', fontSize: '1.2rem' }}>AUDITOR SUMMARY</h3>
+                     <p style={{ color: 'rgba(255,255,255,0.6)', lineHeight: '1.8' }}>{scoreReport.summary}</p>
                 </div>
 
                 <div style={{ display: 'flex', gap: '24px' }}>

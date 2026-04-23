@@ -3,10 +3,10 @@ import { NextResponse } from 'next/server';
 export async function POST(req: Request) {
   try {
     const { company, role, timeline, level } = await req.json();
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || '').replace(/[\n\r]/g, '').trim();
 
     if (!apiKey) {
-      return NextResponse.json({ error: 'ANTHROPIC_API_KEY Missing' }, { status: 500 });
+      return NextResponse.json({ error: 'GEMINI_API_KEY Missing' }, { status: 500 });
     }
 
     // 📐 Universal Scaling Intelligence (Strict Protocol v14.0)
@@ -70,22 +70,18 @@ export async function POST(req: Request) {
     
     Zero preamble. Direct JSON response only. No backticks.`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 8000,
-        messages: [{ role: 'user', content: systemPrompt }]
+        contents: [
+          { role: 'user', parts: [{ text: systemPrompt }] }
+        ]
       })
     });
 
     const data = await response.json();
-    const content = data.content?.[0]?.text || '';
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {

@@ -62,9 +62,16 @@ function QuizContent() {
        setFlagged(new Array(fetchedQuestions.length).fill(false));
      } catch (err) { 
         console.error(err);
-        setQuestions([{ id: 1, question: "What is the worst-case complexity of a balanced AVL tree?", options: ["O(N)", "O(log N)", "O(N log N)", "O(1)"], correctAnswer: 1 }]);
-        setUserAnswers([null]);
-        setFlagged([false]);
+        const fallbackQs = [
+          { id: 1, question: "What is the time complexity of a Linear Search in an array of size N?", options: ["O(1)", "O(log N)", "O(N)", "O(N^2)"], correctAnswer: 2 },
+          { id: 2, question: "Which data structure follows the LIFO (Last In First Out) principle?", options: ["Queue", "Stack", "Linked List", "Binary Tree"], correctAnswer: 1 },
+          { id: 3, question: "What is the average case complexity of Quick Sort?", options: ["O(N)", "O(N log N)", "O(N^2)", "O(log N)"], correctAnswer: 1 },
+          { id: 4, question: "In a balanced BST like AVL, what is the maximum height?", options: ["O(1)", "O(log N)", "O(N)", "O(N log N)"], correctAnswer: 1 },
+          { id: 5, question: "Which algorithm is used to find the shortest path in a weighted graph with no negative edges?", options: ["BFS", "DFS", "Dijkstra", "Kruskal"], correctAnswer: 2 }
+        ];
+        setQuestions(fallbackQs);
+        setUserAnswers(new Array(fallbackQs.length).fill(null));
+        setFlagged(new Array(fallbackQs.length).fill(false));
      } finally { setLoading(false); }
   };
 
@@ -339,7 +346,7 @@ function QuizContent() {
           .neural-particles { position: absolute; width: 100%; height: 100%; z-index: 2; pointer-events: none; opacity: 0.15; }
           .particle { position: absolute; width: 2px; height: 2px; background: #fff; border-radius: 50%; animation: pulseOpacity 5s infinite; }
           @keyframes pulseOpacity { 0%, 100% { opacity: 0; transform: scale(0); } 50% { opacity: 0.5; transform: scale(1.5); } }
-          ${[...Array(15)].map((_, i) => `.particle:nth-child(${i+1}) { top: ${Math.random()*100}%; left: ${Math.random()*100}%; animation-delay: ${Math.random()*5}s; }`).join('')}
+          ${[...Array(15)].map((_, i) => `.particle:nth-child(${i+1}) { top: ${(i * 17) % 100}%; left: ${(i * 23) % 100}%; animation-delay: ${(i * 0.7) % 5}s; }`).join('')}
 
           /* 🔝 Elite HUD Header */
           .master-hud { flex-shrink: 0; height: 50px; padding: 0 30px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255, 255, 255, 0.04); background: rgba(5, 3, 8, 0.85); backdrop-filter: blur(40px); z-index: 1000; }

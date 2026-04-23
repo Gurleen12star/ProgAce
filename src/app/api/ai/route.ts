@@ -98,6 +98,56 @@ async function callGroq(apiKey: string, systemPrompt: string, messages: any[]): 
   return data.choices?.[0]?.message?.content || '';
 }
 
+async function callGemma(apiKey: string, systemPrompt: string, messages: any[]): Promise<string> {
+  const modelsToTry = [
+    'gemini-3.1-flash',
+    'gemini-3-flash',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite'
+  ];
+
+  let lastErrorMsg = '';
+
+  for (const modelName of modelsToTry) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: messages && messages.length > 0 
+            ? messages.map((m: any, i: number) => ({
+                role: m.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: i === 0 ? `${systemPrompt}\n\nUser Input: ${m.content}` : m.content }]
+              }))
+            : [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nHello` }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1024,
+          }
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      }
+
+      const err = await response.json().catch(() => ({}));
+      lastErrorMsg = err.error?.message || response.statusText;
+      console.warn(`Tutor Model ${modelName} failed: ${lastErrorMsg}`);
+      continue;
+
+    } catch (err: any) {
+      lastErrorMsg = err.message;
+      continue;
+    }
+  }
+
+  throw new Error(`Google AI Overloaded: ${lastErrorMsg}`);
+}
+
 export async function POST(req: Request) {
   try {
     const { messages, problemContext, currentCode, currentLanguage = 'javascript' } = await req.json();
@@ -105,6 +155,7 @@ export async function POST(req: Request) {
 
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     const groqKey      = process.env.GROQ_API_KEY;
+    const googleKey    = (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY || '').replace(/[\n\r]/g, '').trim();
 
     // Try Claude (Multi-model fallback)
     if (anthropicKey && !anthropicKey.includes('your_')) {
@@ -126,10 +177,20 @@ export async function POST(req: Request) {
       }
     }
 
+    // Try Gemma 2 as lightweight/efficient fallback
+    if (googleKey) {
+      try {
+        const content = await callGemma(googleKey, systemPrompt, messages);
+        if (content) return NextResponse.json({ content, provider: 'gemma' });
+      } catch (err: any) {
+        console.error('Gemma fallback failed:', err.message);
+      }
+    }
+
     return NextResponse.json({ error: 'All AI providers failed.' }, { status: 500 });
 
   } catch (error: any) {
-    console.error('AI Route Error:', error);
-    return NextResponse.json({ error: 'Request failed: ' + error.message }, { status: 500 });
+    console.error('AI_ROUTING_ERROR:', error);
+    return NextResponse.json({ error: `AI Gateway Error: ${error.message}` }, { status: 500 });
   }
 }

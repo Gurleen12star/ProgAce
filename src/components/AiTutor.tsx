@@ -58,7 +58,7 @@ export default function AiTutor({ isOpen, onClose, problemContext, currentCode, 
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.content }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "⚠️ Connection error. Make sure your API keys (Claude, DeepSeek, or Groq) are valid in `.env.local`." }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: "⚠️ Connection error. Make sure your API keys (Claude, Gemma, or Groq) are valid in `.env.local`." }]);
     } finally {
       setIsLoading(false);
     }
@@ -81,7 +81,7 @@ export default function AiTutor({ isOpen, onClose, problemContext, currentCode, 
       <header style={{ padding: '20px', borderBottom: '1px solid var(--card-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Sparkles size={20} color="var(--color-pink)" />
-          <span style={{ fontWeight: 600, fontSize: '1rem' }}>Nexus AI <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400, marginLeft: 4 }}>Claude</span></span>
+          <span style={{ fontWeight: 600, fontSize: '1rem' }}>Nexus AI <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400, marginLeft: 4 }}>Claude + Gemma</span></span>
         </div>
         <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
           <X size={20} />

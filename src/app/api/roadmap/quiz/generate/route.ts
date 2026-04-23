@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server';
-import Groq from 'groq-sdk';
 
 export async function POST(req: Request) {
   try {
     const { goal, role, focus, language } = await req.json();
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || '').replace(/[\n\r]/g, '').trim();
 
     if (!apiKey) {
-      return NextResponse.json({ error: 'GROQ_API_KEY Missing' }, { status: 500 });
+      return NextResponse.json({ error: 'GEMINI_API_KEY Missing' }, { status: 500 });
     }
-
-    const groq = new Groq({ apiKey });
 
     const systemPrompt = `You are a World-Class Technical Interviewer and Domain Expert. 
 Generate exactly 5 multiple-choice questions (MCQs) with MIXED DIFFICULTY (Easy, Medium, Hard) to evaluate a student's expertise in a specific professional domain.
@@ -35,18 +32,33 @@ JSON Structure:
       "correctAnswer": 0
     }
   ]
-}`;
+}
 
-    const chatCompletion = await groq.chat.completions.create({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: "Generate a unique 5-question test paper with mixed difficulty. Ensure valid JSON format." }
-      ],
-      model: "llama-3.1-8b-instant",
-      response_format: { type: "json_object" }
+Return ONLY valid JSON. Do not include markdown code blocks or explanations.`;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [
+          { role: 'user', parts: [{ text: 'Generate a unique 5-question test paper with mixed difficulty. Ensure valid JSON format and nothing else.' }] }
+        ]
+      })
     });
 
-    const content = chatCompletion.choices[0]?.message?.content || "{}";
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Gemini API Error:', errText);
+      throw new Error(`Gemini API failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    let content = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    
+    // Clean up markdown block if Gemini wraps it
+    content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+
     let quizData;
     try {
       quizData = JSON.parse(content);
