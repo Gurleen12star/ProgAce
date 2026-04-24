@@ -5,6 +5,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 **ProgAce** is a high-fidelity career mastery platform designed to bridge the gap between Junior Developers and Staff-level Architects. Built with **Adaptive AI**, it transforms the standard "tutorial hell" into a data-driven journey of professional excellence.
+<img width="1342" height="641" alt="WhatsApp Image 2026-04-24 at 4 24 00 PM" src="https://github.com/user-attachments/assets/55c4319f-9d00-4070-be28-c9307c1ddf5d" />
 
 ---
 
@@ -68,7 +69,7 @@ A premium, integrated workspace for competitive programming and system design pr
 <img width="1350" height="627" alt="WhatsApp Image 2026-04-24 at 4 26 32 PM" src="https://github.com/user-attachments/assets/46e67d00-c069-411f-bdae-25b3f2ed6f8d" />
 <img width="1365" height="628" alt="WhatsApp Image 2026-04-24 at 4 25 50 PM" src="https://github.com/user-attachments/assets/4ca83cae-5c79-480c-bb11-e2ab9e7db2d0" />
 <img width="1365" height="636" alt="WhatsApp Image 2026-04-24 at 4 24 44 PM" src="https://github.com/user-attachments/assets/aafb5890-480a-41c9-a673-f636e183c56e" />
-<img width="1342" height="641" alt="WhatsApp Image 2026-04-24 at 4 24 00 PM" src="https://github.com/user-attachments/assets/55c4319f-9d00-4070-be28-c9307c1ddf5d" />
+
 
 
 
