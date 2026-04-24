@@ -19,6 +19,7 @@ The ProgAce experience is built on a 4-step progressive track designed to ensure
 3.  **Elite Training**: Mastery-based learning modules with gatekeeper tests, ensuring you don't move forward until you've truly mastered the topic.
 4.  **Staff-Level Interview**: AI Voice Mock Interviews that simulate real-world technical bar-raising sessions.
 
+
    ```mermaid
 flowchart TD
     A[User Developer] --> B[Diagnostic Suite]
@@ -42,6 +43,7 @@ flowchart TD
 
     J --> K[Career Ready Staff Level]
 ```
+<img width="1365" height="636" alt="WhatsApp Image 2026-04-24 at 4 24 44 PM" src="https://github.com/user-attachments/assets/aafb5890-480a-41c9-a673-f636e183c56e" />
 
 ---
 
@@ -66,9 +68,11 @@ Practice like you play. Our AI voice assistant conducts real-time technical inte
 A premium, integrated workspace for competitive programming and system design practice.
 *   **Multi-Model Intelligence**: Get hints and code reviews from Claude 3.5 and Llama 3.3.
 *   **Production Standards**: Learn to write code that meets Staff-level architectural standards.
+---
+##DEMO
 <img width="1350" height="627" alt="WhatsApp Image 2026-04-24 at 4 26 32 PM" src="https://github.com/user-attachments/assets/46e67d00-c069-411f-bdae-25b3f2ed6f8d" />
 <img width="1365" height="628" alt="WhatsApp Image 2026-04-24 at 4 25 50 PM" src="https://github.com/user-attachments/assets/4ca83cae-5c79-480c-bb11-e2ab9e7db2d0" />
-<img width="1365" height="636" alt="WhatsApp Image 2026-04-24 at 4 24 44 PM" src="https://github.com/user-attachments/assets/aafb5890-480a-41c9-a673-f636e183c56e" />
+
 
 
 
